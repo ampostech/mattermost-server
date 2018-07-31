@@ -587,6 +587,13 @@ func (a *App) sendPushNotification(post *model.Post, user *model.User, channel *
 		msg.Badge = int(badge.Data.(int64))
 	}
 
+	senderDetail, err := a.GetUser(post.UserId)
+	if err != nil {
+		return err
+	}
+
+	senderDisplayName := senderDetail.GetDisplayName("nickname_full_name")
+
 	msg.Type = model.PUSH_TYPE_MESSAGE
 	msg.TeamId = channel.TeamId
 	msg.ChannelId = channel.Id
@@ -610,7 +617,7 @@ func (a *App) sendPushNotification(post *model.Post, user *model.User, channel *
 	userLocale := utils.GetUserTranslations(user.Locale)
 	hasFiles := post.FileIds != nil && len(post.FileIds) > 0
 
-	msg.Message, msg.Category = a.getPushNotificationMessage(post.Message, wasMentioned, hasFiles, senderName, channelName, channel.Type, userLocale)
+	msg.Message, msg.Category = a.getPushNotificationMessage(post.Message, wasMentioned, hasFiles, senderDisplayName, channelName, channel.Type, userLocale)
 
 	for _, session := range sessions {
 		tmpMessage := *model.PushNotificationFromJson(strings.NewReader(msg.ToJson()))
@@ -723,6 +730,9 @@ func (a *App) ClearPushNotification(userId string, channelId string) {
 
 func (a *App) sendToPushProxy(msg model.PushNotification, session *model.Session) {
 	msg.ServerId = a.DiagnosticId()
+
+	l4g.Info("message sending to push proxy : ")
+	l4g.Info(msg.ToJson())
 
 	request, _ := http.NewRequest("POST", *a.Config().EmailSettings.PushNotificationServer+model.API_URL_SUFFIX_V1+"/send_push", strings.NewReader(msg.ToJson()))
 
